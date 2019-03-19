@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECR repositories stack for Application Project
+Parameters:
+  BucketUrl:
+    Type: String
+    Default: https://s3.us-east-1.amazonaws.com/template
+  ECRRegistryName:
+    Type: String
+    Description: ECR Registry name. 
+Resources:
+  AppECR:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:
+        Fn::Sub: "${BucketUrl}/templates/ecr.yaml"
+      Parameters:
+        RegistryName:
+          Ref: ECRRegistryName
+Outputs:
+  ApplicationECR:
+    Description: Application AppECR
+    Value:
+      Ref: AppECR

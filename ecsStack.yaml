@@ -1,0 +1,172 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECS Cluster and ELB template
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Resource Identification
+      Parameters:
+      - Project
+      - Environment
+    - Label:
+        default: Network Configuration
+      Parameters:
+      - VpcId
+Parameters:
+  BucketUrl:
+    Type: String
+    Default: https://s3.us-east-1.amazonaws.com/templates
+  Project:
+    Description: Project name. (Max 6 chars)
+    Type: String
+  Environment:
+    Description: Environment of the project
+    Type: String
+    Default: dev
+  Country:
+    Description: Country name in ISO-3166-1
+    Type: String
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: Select a VPC that allows instances to access the Internet.
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet::Id
+    Description: List of an existing subnet IDs to use for the load balancer and auto
+      scaling group
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet::Id
+    Description: List of an existing subnet IDs to use for the load balancer and auto
+      scaling group
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet::Id
+    Description: List of an existing private subnet IDs
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet::Id
+    Description: List of an existing private subnet IDs
+  owner:
+    Description: Owner of this stack
+    Type: String
+    Default: hernan.urban@globallogic.com
+  BorderBastionPem:
+    Type: AWS::EC2::KeyPair::KeyName
+  ImageRepoName:
+    Description: ECR Imae Repository name
+    Type: String
+Resources:
+  SecurityGroups:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:
+        Fn::Sub: "${BucketUrl}/templates/Security-Groups.yaml"
+      Parameters:
+        VPC:
+          Ref: VpcId
+        environment:
+          Ref: Environment
+        owner:
+          Ref: owner
+        project:
+          Ref: Project
+  PublicALB:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:
+        Fn::Sub: "${BucketUrl}/templates/ECS-ALB.yaml"
+      Parameters:
+        VPC:
+          Ref: VpcId
+        PublicSubnetA:
+          Ref: PublicSubnetA
+        PublicSubnetB:
+          Ref: PublicSubnetB
+        Scheme: internet-facing
+        servicegroup: Public
+        ELBSecurityGroup:
+          Fn::GetAtt:
+          - SecurityGroups
+          - Outputs.ALBSecurityGroup
+        environment:
+          Ref: Environment
+        owner:
+          Ref: owner
+        project:
+          Ref: Project
+  Cluster:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:
+        Fn::Sub: "${BucketUrl}/templates/ecs-cluster.yaml"
+      Parameters:
+        ClusterName:
+          Fn::Sub: "${Project}-${Environment}"
+  ApplicationECS:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:
+        Fn::Sub: "${BucketUrl}/templates/App-Service.yaml"
+      Parameters:
+        VPC:
+          Ref: VpcId
+        environment:
+          Ref: Environment
+        owner:
+          Ref: owner
+        project:
+          Ref: Project
+        ECSSecurityGroup:
+          Fn::GetAtt:
+          - SecurityGroups
+          - Outputs.ECSSecurityGroup
+        DesiredCount: 1
+        ServiceName:
+          Fn::Sub: App-${Project}-${Country}-${Environment}
+        Cluster:
+          Fn::GetAtt:
+          - Cluster
+          - Outputs.Cluster
+        Repository:
+          Ref: ImageRepoName
+        RepositoryTag: latest
+        PrivateSubnetA:
+          Ref: PrivateSubnetA
+        PrivateSubnetB:
+          Ref: PrivateSubnetB
+        ContainerCpu: '512'
+        ContainerMemory: '1024'
+        ContainerPort: 8080
+        TGPort: '80'
+        HealthyThresholdCount: 2
+        UnhealthyThresholdCount: 2
+        HealthCheckTimeoutSeconds: 5
+        HealthCheckIntervalSeconds: 10
+        PathPattern: ''
+        Healthcheck: '/actuator/health'
+        MaxCapacity: '10'
+        MinCapacity: '1'
+        LoadBalancerListener:
+          Fn::GetAtt:
+          - PublicALB
+          - Outputs.Listener
+        Priority: '10'
+        ECSname: BackendAPI
+  BorderBastion:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL:
+        Fn::Sub: "${BucketUrl}/templates/bastion.yaml"
+      Parameters:
+        BorderBastionImageId: ami-66506c1c
+        BorderBastionPem:
+          Ref: BorderBastionPem
+        BorderBastionInstanceType: t2.micro
+        BastionPubSubnet:
+          Ref: PublicSubnetA
+        environment:
+          Ref: Environment
+        owner:
+          Ref: owner
+        project:
+          Ref: Project
+        VpcId:
+          Ref: VpcId

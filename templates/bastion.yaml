@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Border Bastion
+Parameters:
+  VpcId:
+    Type: String
+  BorderBastionImageId:
+    Type: String
+  BorderBastionPem:
+    Type: String
+  BorderBastionInstanceType:
+    Type: String
+  BastionPubSubnet:
+    Type: String
+  environment:
+    Description: Environment to be deployed
+    Type: String
+    Default: dev
+  owner:
+    Description: Owner of this stack
+    Type: String
+  project:
+    Description: Project
+    Type: String
+Resources:
+  PubBastionSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription:
+        Fn::Sub: border-bastion-sg
+      SecurityGroupIngress:
+      - CidrIp: 0.0.0.0/0
+        IpProtocol: TCP
+        FromPort: 22
+        ToPort: 22
+      VpcId:
+        Ref: VpcId
+  BastionEC2:
+    Type: AWS::EC2::Instance
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          FullInstall:
+          - Mysql
+          - Redis-cli
+        Mysql:
+          commands:
+            install-mysql:
+              command: apt-get install -y mysql-client
+        Redis-cli:
+          files:
+            "/tmp/redis.tar.gz":
+              source: http://download.redis.io/redis-stable.tar.gz
+              mode: '000755'
+              owner: root
+              group: root
+          commands:
+            install-gcc:
+              command: apt-get install -y gcc make
+            unzip-make:
+              command: tar xvzf redis.tar.gz && cd redis-stable && make distclean
+                && make
+              cwd: "/tmp"
+            copy-binary:
+              command: cp redis-stable/src/redis-cli /usr/bin/
+              cwd: "/tmp"
+    Properties:
+      ImageId:
+        Ref: BorderBastionImageId
+      KeyName:
+        Ref: BorderBastionPem
+      InstanceType:
+        Ref: BorderBastionInstanceType
+      SecurityGroupIds:
+      - Ref: PubBastionSG
+      SubnetId:
+        Ref: BastionPubSubnet
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+          - ''
+          - - "#!/bin/bash -xe\n"
+            - apt-get update
+            - 'apt-get install -y python-setuptools
+
+'
+            - 'mkdir /tmp/cfn-bootstrap
+
+'
+            - 'cd /tmp
+
+'
+            - 'curl https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+              | tar xz -C cfn-bootstrap --strip-components 1
+
+'
+            - 'easy_install cfn-bootstrap
+
+'
+            - 'LC_ALL=C /usr/local/bin/cfn-init -v '
+            - "--stack "
+            - Ref: AWS::StackName
+            - " --resource BastionEC2 "
+            - " --configsets FullInstall\n"
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - ''
+          - - Bastion
+            - Ref: project
+            - Ref: environment
+      - Key: project
+        Value:
+          Ref: project
+      - Key: environment
+        Value:
+          Ref: environment
+      - Key: owner
+        Value:
+          Ref: owner
+  BastionEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  BastionEIPAssoc:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId:
+        Ref: BastionEC2
+      EIP:
+        Ref: BastionEIP
+Outputs:
+  BastionEIP:
+    Value:
+      Ref: BastionEIP
+  PubBastionSG:
+    Value:
+      Ref: PubBastionSG

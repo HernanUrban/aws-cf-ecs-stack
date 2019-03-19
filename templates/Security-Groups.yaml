@@ -1,0 +1,172 @@
+Description: 'This template contains the security groups required for the ECS microservices Solution'
+Parameters:
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Choose which VPC the security groups should be deployed to
+  environment:
+    Description: Environment to be deployed
+    Type: String
+    Default: dev
+  owner:
+    Description: Owner of this stack
+    Type: String
+  project:
+    Description: Project
+    Type: String
+Resources:
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Ref: VPC
+      GroupDescription: Access to the load balancer in front of ECS
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - "-"
+          - - Ref: project
+            - Ref: environment
+            - alb
+            - sg
+      - Key: project
+        Value:
+          Ref: project
+      - Key: environment
+        Value:
+          Ref: environment
+      - Key: owner
+        Value:
+          Ref: owner
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Ref: VPC
+      GroupDescription: Access to the ECS hosts and the tasks/containers that run
+        on them
+      SecurityGroupIngress:
+      - SourceSecurityGroupId:
+          Ref: ALBSecurityGroup
+        IpProtocol: -1
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - "-"
+          - - Ref: project
+            - Ref: environment
+            - ecs
+            - sg
+      - Key: project
+        Value:
+          Ref: project
+      - Key: environment
+        Value:
+          Ref: environment
+      - Key: owner
+        Value:
+          Ref: owner
+  EcsSecurityGroupHTTPinbound:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Ref: ALBSecurityGroup
+      IpProtocol: tcp
+      FromPort: '80'
+      ToPort: '80'
+      CidrIp: 0.0.0.0/0
+  EcsSecurityGroupInternal:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Ref: ECSSecurityGroup
+      IpProtocol: "-1"
+      SourceSecurityGroupId:
+        Ref: ECSSecurityGroup
+  PrivateALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Ref: VPC
+      GroupDescription: Access to the internal load balancer
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - "-"
+          - - Ref: project
+            - Ref: environment
+            - alb-private
+            - sg
+      - Key: project
+        Value:
+          Ref: project
+      - Key: environment
+        Value:
+          Ref: environment
+      - Key: owner
+        Value:
+          Ref: owner
+  PrivateEcsSecurityGroupHTTPinbound:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Ref: PrivateALBSecurityGroup
+      SourceSecurityGroupId:
+        Ref: ECSSecurityGroup
+      IpProtocol: "-1"
+  PrivateECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Ref: VPC
+      GroupDescription: Access to the ECS hosts and the tasks/containers that run
+        on them
+      SecurityGroupIngress:
+      - SourceSecurityGroupId:
+          Ref: PrivateALBSecurityGroup
+        IpProtocol: -1
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - "-"
+          - - Ref: project
+            - Ref: environment
+            - ecs
+            - sg
+      - Key: project
+        Value:
+          Ref: project
+      - Key: environment
+        Value:
+          Ref: environment
+      - Key: owner
+        Value:
+          Ref: owner
+  PrivateEcsSecurityGroupInternal:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Ref: PrivateECSSecurityGroup
+      IpProtocol: "-1"
+      SourceSecurityGroupId:
+        Ref: PrivateECSSecurityGroup
+Outputs:
+  ECSSecurityGroup:
+    Description: A reference to the security group for ECS hosts
+    Value:
+      Ref: ECSSecurityGroup
+  ALBSecurityGroup:
+    Description: A reference to the security group for load balancers
+    Value:
+      Ref: ALBSecurityGroup
+  PrivateALBSecurityGroup:
+    Description: A reference to the security group for private load balancers
+    Value:
+      Ref: PrivateALBSecurityGroup
+  PrivateECSSecurityGroup:
+    Description: A reference to the security group for ECS hosts
+    Value:
+      Ref: PrivateECSSecurityGroup

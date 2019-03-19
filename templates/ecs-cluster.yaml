@@ -1,0 +1,17 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ECS cluster for containers for Applications project
+Parameters:
+  ClusterName:
+    Type: String
+    Description: Value for a cluster name
+Resources:
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName:
+        Ref: ClusterName
+Outputs:
+  Cluster:
+    Description: Cluster
+    Value:
+      Ref: Cluster

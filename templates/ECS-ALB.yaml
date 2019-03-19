@@ -1,0 +1,115 @@
+Description: 'This template deploys an Application Load Balancer that exposes our
+  various ECS services. We create them it a seperate nested template, so it can be
+  referenced by all of the other nested templates.'
+Parameters:
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Choose which VPC the Application Load Balancer should be deployed to
+  PublicSubnetA:
+    Type: String
+    Description: List of an existing subnet IDs to use for the load balancer and auto scaling group
+  PublicSubnetB:
+    Type: String
+    Description: List of an existing subnet IDs to use for the load balancer and auto scaling group
+  ELBSecurityGroup:
+    Description: Select the Security Group to apply to the Application Load Balancer
+    Type: AWS::EC2::SecurityGroup::Id
+  environment:
+    Description: Environment to be deployed
+    Type: String
+    Default: dev
+  owner:
+    Description: Owner of this stack
+    Type: String
+  project:
+    Description: Project
+    Type: String
+  servicegroup:
+    Description: Function to identify the ALB
+    Type: String
+    Default: Public
+  Scheme:
+    Type: String
+Resources:
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name:
+        Fn::Join:
+        - "-"
+        - - Ref: project
+          - Ref: environment
+          - Fn::Select:
+            - '1'
+            - Fn::Split:
+              - "-"
+              - Ref: ELBSecurityGroup
+          - elb
+      Scheme:
+        Ref: Scheme
+      Subnets:
+      - Ref: PublicSubnetA
+      - Ref: PublicSubnetB
+      SecurityGroups:
+      - Ref: ELBSecurityGroup
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - "-"
+          - - Ref: project
+            - Ref: servicegroup
+            - Ref: environment
+            - elb
+      - Key: project
+        Value:
+          Ref: project
+      - Key: environment
+        Value:
+          Ref: environment
+      - Key: owner
+        Value:
+          Ref: owner
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn:
+        Ref: LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: TargetGroup
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId:
+        Ref: VPC
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+Outputs:
+  LoadBalancer:
+    Description: A reference to the Application Load Balancer
+    Value:
+      Ref: LoadBalancer
+    Export:
+      Name:
+        Fn::Sub: "${servicegroup}-ALB"
+  LoadBalancerUrl:
+    Description: The URL of the ALB
+    Value:
+      Fn::GetAtt:
+      - LoadBalancer
+      - DNSName
+    Export:
+      Name:
+        Fn::Sub: "${servicegroup}-ALB-URL"
+  Listener:
+    Description: A reference to a port 80 listener
+    Value:
+      Ref: LoadBalancerListener
+    Export:
+      Name:
+        Fn::Sub: "${servicegroup}-ALB-Listener"
