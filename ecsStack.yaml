@@ -137,9 +137,9 @@ Resources:
         ContainerPort: 8080
         TGPort: '80'
         HealthyThresholdCount: 2
-        UnhealthyThresholdCount: 2
-        HealthCheckTimeoutSeconds: 5
-        HealthCheckIntervalSeconds: 10
+        UnhealthyThresholdCount: 3
+        HealthCheckTimeoutSeconds: 10
+        HealthCheckIntervalSeconds: 15
         PathPattern: ''
         Healthcheck: '/actuator/health'
         MaxCapacity: '10'
