@@ -61,13 +61,13 @@ Parameters:
     Default: 2
   UnhealthyThresholdCount:
     Type: Number
-    Default: 2
+    Default: 3
   HealthCheckTimeoutSeconds:
     Type: Number
-    Default: 5
+    Default: 10
   HealthCheckIntervalSeconds:
     Type: Number
-    Default: 10
+    Default: 15
   PathPattern:
     Type: String
   Healthcheck:
