@@ -57,8 +57,7 @@ Resources:
             install-gcc:
               command: apt-get install -y gcc make
             unzip-make:
-              command: tar xvzf redis.tar.gz && cd redis-stable && make distclean
-                && make
+              command: tar xvzf redis.tar.gz && cd redis-stable && make distclean && make
               cwd: "/tmp"
             copy-binary:
               command: cp redis-stable/src/redis-cli /usr/bin/
